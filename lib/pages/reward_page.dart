@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:bi_mistik/pages/notification_page.dart';
 
 class RewardPage extends StatefulWidget {
   const RewardPage({super.key});
@@ -16,7 +15,6 @@ class _RewardPageState extends State<RewardPage> {
   List<dynamic> claimedIds = [];
   List<dynamic> quests = [];
   bool _isLoading = true;
-  bool _hasUnreadNotification = false; // Tambahkan variabel status notifikasi
 
   @override
   void initState() {
@@ -46,20 +44,11 @@ class _RewardPageState extends State<RewardPage> {
           .from('quests')
           .select('*, badges(title, icon_name)');
 
-      // Cek apakah ada notifikasi yang belum dibaca
-      final nData = await Supabase.instance.client
-          .from('notifications')
-          .select('id')
-          .eq('user_id', user!.id)
-          .eq('is_read', false)
-          .limit(1);
-
       setState(() {
         profileData = pData;
         achievements = List<Map<String, dynamic>>.from(aData); 
         claimedIds = (cData as List).map((e) => e['achievement_id']).toList();
         quests = qData as List;
-        _hasUnreadNotification = (nData as List).isNotEmpty;
         _isLoading = false;
       });
     } catch (e) {
@@ -184,35 +173,7 @@ class _RewardPageState extends State<RewardPage> {
             children: [
               IconButton(icon: const Icon(Icons.arrow_back, color: Color(0xFF213049)), onPressed: () => Navigator.pop(context)),
               const Text('Bi Mistik', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF213049))),
-              const SizedBox(width: 5),
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const NotificationPage()),
-                  ).then((_) => _fetchData()); // Refresh status saat kembali
-                },
-                child: Stack(
-                  children: [
-                    const Icon(Icons.notifications_none, size: 28, color: Color(0xFF213049)),
-                    if (_hasUnreadNotification)
-                      Positioned(
-                        right: 2,
-                        top: 2,
-                        child: Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFF7D99B6), width: 2),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 15),
+              const SizedBox(width: 48),
             ],
           ),
         ),
