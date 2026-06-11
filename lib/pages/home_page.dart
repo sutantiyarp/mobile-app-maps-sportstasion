@@ -497,36 +497,45 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildMapItem() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFF69487D), width: 2.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
+Widget _buildMapItem() {
+    return GestureDetector(
+      onTap: () {
+        setState(() => _selectedIndex = 1);
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const MapPage()),
+        ).then((_) => setState(() => _selectedIndex = 0));
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFF69487D), width: 2.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.map_outlined, color: Color(0xFF213049), size: 30),
           ),
-          child: const Icon(Icons.map_outlined, color: Color(0xFF213049), size: 30),
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Map',
-          style: TextStyle(
-            fontSize: 12, 
-            color: Color(0xFF213049), 
-            fontWeight: FontWeight.bold
+          const SizedBox(height: 4),
+          const Text(
+            'Map',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF213049),
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
