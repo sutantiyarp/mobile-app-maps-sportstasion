@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:bi_mistik/pages/profile_page.dart';
 import 'package:bi_mistik/pages/notification_page.dart';
+import 'package:bi_mistik/pages/map_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
