@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -11,18 +12,17 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> {
-  GoogleMapController? _mapController;
-  final Set<Marker> _markers = {};
+  final MapController _mapController = MapController();
   List<Map<String, dynamic>> _locations = [];
   String _activeFilter = 'all';
   bool _isLoading = true;
   LatLng? _currentPosition;
 
-  static const Color primaryColor   = Color(0xFF7D99B6);
-  static const Color secondaryColor = Color(0xFF69487D);
-  static const Color tokoColor      = Color(0xFFf97316);
-  static const Color lapanganColor  = Color(0xFF16a34a);
-  static const Color textColor      = Color(0xFF213049);
+  static const Color primaryColor  = Color(0xFF7D99B6);
+  static const Color tokoColor     = Color(0xFFf97316);
+  static const Color lapanganColor = Color(0xFF16a34a);
+  static const Color textColor     = Color(0xFF213049);
+  static const LatLng _defaultCenter = LatLng(-7.2575, 112.7521);
 
   @override
   void initState() {
@@ -47,9 +47,7 @@ class _MapPageState extends State<MapPage> {
         setState(() {
           _currentPosition = LatLng(pos.latitude, pos.longitude);
         });
-        _mapController?.animateCamera(
-          CameraUpdate.newLatLngZoom(_currentPosition!, 13),
-        );
+        _mapController.move(_currentPosition!, 14);
       }
     } catch (e) {
       debugPrint('Location error: $e');
@@ -68,7 +66,6 @@ class _MapPageState extends State<MapPage> {
           _locations = List<Map<String, dynamic>>.from(data);
           _isLoading = false;
         });
-        _buildMarkers();
       }
     } catch (e) {
       debugPrint('Fetch error: $e');
@@ -76,69 +73,12 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  void _buildMarkers() {
-    final filtered = _activeFilter == 'all'
-        ? _locations
-        : _locations.where((l) {
-            if (_activeFilter == 'toko') return l['kategori'] == 'toko_olahraga';
-            return l['kategori'] == 'lapangan_badminton';
-          }).toList();
-
-    final Set<Marker> newMarkers = {};
-
-    for (final loc in filtered) {
-      final isToko = loc['kategori'] == 'toko_olahraga';
-      final markerId = MarkerId(loc['id'].toString());
-
-      newMarkers.add(
-        Marker(
-          markerId: markerId,
-          position: LatLng(
-            (loc['lat'] as num).toDouble(),
-            (loc['lng'] as num).toDouble(),
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            isToko
-                ? BitmapDescriptor.hueOrange
-                : BitmapDescriptor.hueGreen,
-          ),
-          infoWindow: InfoWindow(
-            title: loc['nama'] ?? '-',
-            snippet: loc['alamat'] ?? (isToko ? '🏪 Toko Olahraga' : '🏸 Lapangan Badminton'),
-          ),
-          onTap: () => _showLocationDetail(loc),
-        ),
-      );
+  List<Map<String, dynamic>> get _filteredLocations {
+    if (_activeFilter == 'all') return _locations;
+    if (_activeFilter == 'toko') {
+      return _locations.where((l) => l['kategori'] == 'toko_olahraga').toList();
     }
-
-    setState(() => _markers
-      ..clear()
-      ..addAll(newMarkers));
-
-    if (newMarkers.isNotEmpty && _mapController != null) {
-      _fitBounds(newMarkers);
-    }
-  }
-
-  void _fitBounds(Set<Marker> markers) {
-    double minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
-    for (final m in markers) {
-      final lat = m.position.latitude;
-      final lng = m.position.longitude;
-      if (lat < minLat) minLat = lat;
-      if (lat > maxLat) maxLat = lat;
-      if (lng < minLng) minLng = lng;
-      if (lng > maxLng) maxLng = lng;
-    }
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(minLat - 0.01, minLng - 0.01),
-          northeast: LatLng(maxLat + 0.01, maxLng + 0.01),
-        ),
-        60,
-      ),
-    );
+    return _locations.where((l) => l['kategori'] == 'lapangan_badminton').toList();
   }
 
   void _showLocationDetail(Map<String, dynamic> loc) {
@@ -158,8 +98,7 @@ class _MapPageState extends State<MapPage> {
           children: [
             Center(
               child: Container(
-                width: 36,
-                height: 4,
+                width: 36, height: 4,
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(2),
@@ -167,26 +106,22 @@ class _MapPageState extends State<MapPage> {
               ),
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: isToko
-                        ? tokoColor.withOpacity(0.12)
-                        : lapanganColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    isToko ? '🏪 Toko Olahraga' : '🏸 Lapangan Badminton',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: isToko ? tokoColor : lapanganColor,
-                    ),
-                  ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: isToko
+                    ? tokoColor.withOpacity(0.12)
+                    : lapanganColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                isToko ? '🏪 Toko Olahraga' : '🏸 Lapangan Badminton',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: isToko ? tokoColor : lapanganColor,
                 ),
-              ],
+              ),
             ),
             const SizedBox(height: 12),
             Text(
@@ -217,14 +152,12 @@ class _MapPageState extends State<MapPage> {
               child: ElevatedButton.icon(
                 onPressed: () {
                   Navigator.pop(context);
-                  _mapController?.animateCamera(
-                    CameraUpdate.newLatLngZoom(
-                      LatLng(
-                        (loc['lat'] as num).toDouble(),
-                        (loc['lng'] as num).toDouble(),
-                      ),
-                      16,
+                  _mapController.move(
+                    LatLng(
+                      (loc['lat'] as num).toDouble(),
+                      (loc['lng'] as num).toDouble(),
                     ),
+                    16,
                   );
                 },
                 icon: const Icon(Icons.my_location, size: 18),
@@ -248,15 +181,12 @@ class _MapPageState extends State<MapPage> {
   void _goToMyLocation() async {
     await _initLocation();
     if (_currentPosition != null) {
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLngZoom(_currentPosition!, 15),
-      );
+      _mapController.move(_currentPosition!, 15);
     }
   }
 
   void _setFilter(String f) {
     setState(() => _activeFilter = f);
-    _buildMarkers();
   }
 
   int get _tokoCount => _locations.where((l) => l['kategori'] == 'toko_olahraga').length;
@@ -290,11 +220,7 @@ class _MapPageState extends State<MapPage> {
                     const SizedBox(width: 12),
                     const Text(
                       'Peta Lokasi Olahraga',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
                     const Spacer(),
                     GestureDetector(
@@ -331,50 +257,97 @@ class _MapPageState extends State<MapPage> {
           Expanded(
             child: Stack(
               children: [
-                GoogleMap(
-                  onMapCreated: (controller) {
-                    _mapController = controller;
-                    if (_currentPosition != null) {
-                      controller.animateCamera(
-                        CameraUpdate.newLatLngZoom(_currentPosition!, 13),
-                      );
-                    } else {
-                      controller.animateCamera(
-                        CameraUpdate.newLatLngZoom(
-                          const LatLng(-7.2575, 112.7521),
-                          12,
-                        ),
-                      );
-                    }
-                    if (_markers.isNotEmpty) _fitBounds(_markers);
-                  },
-                  initialCameraPosition: const CameraPosition(
-                    target: LatLng(-7.2575, 112.7521),
-                    zoom: 12,
+                FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _currentPosition ?? _defaultCenter,
+                    initialZoom: 13,
                   ),
-                  markers: _markers,
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: false,
-                  zoomControlsEnabled: false,
-                  mapToolbarEnabled: false,
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.bi_mistik',
+                    ),
+                    if (_currentPosition != null)
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: _currentPosition!,
+                            width: 20,
+                            height: 20,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: primaryColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 3),
+                                boxShadow: [
+                                  BoxShadow(color: primaryColor.withOpacity(0.5), blurRadius: 8),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    MarkerLayer(
+                      markers: _filteredLocations.map((loc) {
+                        final isToko = loc['kategori'] == 'toko_olahraga';
+                        final color = isToko ? tokoColor : lapanganColor;
+                        final emoji = isToko ? '🏪' : '🏸';
+                        return Marker(
+                          point: LatLng(
+                            (loc['lat'] as num).toDouble(),
+                            (loc['lng'] as num).toDouble(),
+                          ),
+                          width: 40,
+                          height: 50,
+                          child: GestureDetector(
+                            onTap: () => _showLocationDetail(loc),
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 36, height: 36,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                    boxShadow: [
+                                      BoxShadow(color: color.withOpacity(0.4), blurRadius: 6, offset: const Offset(0, 3)),
+                                    ],
+                                  ),
+                                  child: Center(child: Text(emoji, style: const TextStyle(fontSize: 16))),
+                                ),
+                                CustomPaint(
+                                  size: const Size(10, 8),
+                                  painter: _TrianglePainter(color),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                 ),
-
                 if (_isLoading)
                   Container(
                     color: Colors.white.withOpacity(0.8),
-                    child: const Center(
-                      child: CircularProgressIndicator(color: primaryColor),
-                    ),
+                    child: const Center(child: CircularProgressIndicator(color: primaryColor)),
                   ),
-
                 Positioned(
-                  right: 16,
-                  bottom: 180,
+                  right: 16, bottom: 20,
                   child: FloatingActionButton.small(
                     heroTag: 'myLoc',
                     onPressed: _goToMyLocation,
                     backgroundColor: Colors.white,
                     child: const Icon(Icons.my_location, color: primaryColor),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0, right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    color: Colors.white.withOpacity(0.7),
+                    child: const Text('© OpenStreetMap contributors', style: TextStyle(fontSize: 9, color: Colors.black54)),
                   ),
                 ),
               ],
@@ -385,20 +358,14 @@ class _MapPageState extends State<MapPage> {
             decoration: const BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              boxShadow: [
-                BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -4)),
-              ],
+              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -4))],
             ),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
             child: Column(
               children: [
                 Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -432,11 +399,7 @@ class _MapPageState extends State<MapPage> {
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: isActive ? Colors.white : textColor,
-          ),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isActive ? Colors.white : textColor),
         ),
       ),
     );
@@ -446,29 +409,34 @@ class _MapPageState extends State<MapPage> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(14),
-        ),
+        decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(14)),
         child: Column(
           children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: color,
-              ),
-            ),
+            Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
             const SizedBox(height: 4),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11, color: Colors.blueGrey),
-            ),
+            Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
           ],
         ),
       ),
     );
   }
+}
+
+class _TrianglePainter extends CustomPainter {
+  final Color color;
+  _TrianglePainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_TrianglePainter oldDelegate) => false;
 }
