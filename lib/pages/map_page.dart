@@ -1,3 +1,4 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -57,9 +58,9 @@ class _MapPageState extends State<MapPage> {
   Future<void> _fetchLocations() async {
     try {
       final data = await Supabase.instance.client
-          .from('locations')
+          .from('places')
           .select()
-          .order('kategori');
+          .order('name');
 
       if (mounted) {
         setState(() {
@@ -76,13 +77,21 @@ class _MapPageState extends State<MapPage> {
   List<Map<String, dynamic>> get _filteredLocations {
     if (_activeFilter == 'all') return _locations;
     if (_activeFilter == 'toko') {
-      return _locations.where((l) => l['kategori'] == 'toko_olahraga').toList();
+      return _locations.where((l) =>
+        (l['kategori'] ?? 'toko_olahraga') == 'toko_olahraga'
+      ).toList();
     }
-    return _locations.where((l) => l['kategori'] == 'lapangan_badminton').toList();
+    return _locations.where((l) =>
+      (l['kategori'] ?? 'toko_olahraga') == 'lapangan_badminton'
+    ).toList();
+  }
+
+  bool _isLapangan(Map<String, dynamic> loc) {
+    return (loc['kategori'] ?? 'toko_olahraga') == 'lapangan_badminton';
   }
 
   void _showLocationDetail(Map<String, dynamic> loc) {
-    final isToko = loc['kategori'] == 'toko_olahraga';
+    final isLap = _isLapangan(loc);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -109,28 +118,33 @@ class _MapPageState extends State<MapPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: isToko
-                    ? tokoColor.withOpacity(0.12)
-                    : lapanganColor.withOpacity(0.12),
+                color: isLap
+                    ? lapanganColor.withOpacity(0.12)
+                    : tokoColor.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                isToko ? '🏪 Toko Olahraga' : '🏸 Lapangan Badminton',
+                isLap ? '🏸 Lapangan Badminton' : '🏪 Toko Olahraga',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: isToko ? tokoColor : lapanganColor,
+                  color: isLap ? lapanganColor : tokoColor,
                 ),
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              loc['nama'] ?? '-',
+              loc['name'] ?? '-',
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: textColor,
               ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              loc['description'] ?? '-',
+              style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
             ),
             const SizedBox(height: 8),
             Row(
@@ -139,7 +153,7 @@ class _MapPageState extends State<MapPage> {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    loc['alamat'] ?? '-',
+                    loc['address'] ?? '-',
                     style: const TextStyle(fontSize: 13, color: Colors.blueGrey),
                   ),
                 ),
@@ -154,8 +168,8 @@ class _MapPageState extends State<MapPage> {
                   Navigator.pop(context);
                   _mapController.move(
                     LatLng(
-                      (loc['lat'] as num).toDouble(),
-                      (loc['lng'] as num).toDouble(),
+                      (loc['latitude'] as num).toDouble(),
+                      (loc['longitude'] as num).toDouble(),
                     ),
                     16,
                   );
@@ -189,8 +203,8 @@ class _MapPageState extends State<MapPage> {
     setState(() => _activeFilter = f);
   }
 
-  int get _tokoCount => _locations.where((l) => l['kategori'] == 'toko_olahraga').length;
-  int get _lapanganCount => _locations.where((l) => l['kategori'] == 'lapangan_badminton').length;
+  int get _tokoCount => _locations.where((l) => !_isLapangan(l)).length;
+  int get _lapanganCount => _locations.where((l) => _isLapangan(l)).length;
 
   @override
   Widget build(BuildContext context) {
@@ -261,7 +275,7 @@ class _MapPageState extends State<MapPage> {
                   mapController: _mapController,
                   options: MapOptions(
                     initialCenter: _currentPosition ?? _defaultCenter,
-                    initialZoom: 13,
+                    initialZoom: 6,
                   ),
                   children: [
                     TileLayer(
@@ -290,13 +304,13 @@ class _MapPageState extends State<MapPage> {
                       ),
                     MarkerLayer(
                       markers: _filteredLocations.map((loc) {
-                        final isToko = loc['kategori'] == 'toko_olahraga';
-                        final color = isToko ? tokoColor : lapanganColor;
-                        final emoji = isToko ? '🏪' : '🏸';
+                        final isLap = _isLapangan(loc);
+                        final color = isLap ? lapanganColor : tokoColor;
+                        final emoji = isLap ? '🏸' : '🏪';
                         return Marker(
                           point: LatLng(
-                            (loc['lat'] as num).toDouble(),
-                            (loc['lng'] as num).toDouble(),
+                            (loc['latitude'] as num).toDouble(),
+                            (loc['longitude'] as num).toDouble(),
                           ),
                           width: 40,
                           height: 50,
@@ -374,7 +388,7 @@ class _MapPageState extends State<MapPage> {
                     const SizedBox(width: 10),
                     _statCard('$_lapanganCount', 'Lapangan\nBadminton', lapanganColor),
                     const SizedBox(width: 10),
-                    _statCard('${_tokoCount + _lapanganCount}', 'Total\nLokasi', primaryColor),
+                    _statCard('${_locations.length}', 'Total\nLokasi', primaryColor),
                   ],
                 ),
               ],
@@ -429,7 +443,7 @@ class _TrianglePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = color;
-    final path = Path()
+    final path = ui.Path()
       ..moveTo(0, 0)
       ..lineTo(size.width, 0)
       ..lineTo(size.width / 2, size.height)
