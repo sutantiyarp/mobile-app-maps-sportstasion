@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:bi_mistik/pages/login_page.dart';
-import 'package:bi_mistik/pages/auth_wrapper.dart';
+import 'package:bi_mistik/pages/auth/login_page.dart';
+import 'package:bi_mistik/pages/auth/auth_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
